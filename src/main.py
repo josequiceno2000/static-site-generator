@@ -30,14 +30,17 @@ def text_node_to_html_node(text_node):
 def split_nodes_delimiter(old_nodes, delimiter, text_type):
     new_nodes = []
     for node in old_nodes:
+        if node.text_type != TextType.NORMAL_TEXT:
+            new_nodes.append(node)
+            continue
+
         node_sections = node.text.split(delimiter)
-        node_text_type = node.text_type
-        for text in node_sections:
-            if node_sections.index(text) % 2 != 0:
+        for i, text in enumerate(node_sections):
+            if i % 2 != 0:
                 new_nodes.append(TextNode(text, text_type))
-            else:
-                new_nodes.append(TextNode(text, node_text_type))
-        return(new_nodes)
+            elif text:
+                new_nodes.append(TextNode(text, TextType.NORMAL_TEXT))
+    return(new_nodes)
 
 def split_nodes_image(old_nodes):
     new_nodes = []
@@ -69,7 +72,6 @@ def split_nodes_image(old_nodes):
 
     return new_nodes
 
-
 def split_nodes_link(old_nodes):
     new_nodes = []
 
@@ -98,8 +100,7 @@ def split_nodes_link(old_nodes):
         if remaining_text:
             new_nodes.append(TextNode(remaining_text, TextType.NORMAL_TEXT))
 
-    return new_nodes
-    
+    return new_nodes    
 
 def extract_markdown_images(text):
     return re.findall(r"!\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
@@ -107,10 +108,20 @@ def extract_markdown_images(text):
 def extract_markdown_links(text):
     return re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
 
-def main():
-    my_node = TextNode("This is text with a `code block` word", TextType.NORMAL_TEXT)
-    print(split_nodes_delimiter([my_node], "`", TextType.CODE_TEXT))
+def text_to_textnodes(text):
+    nodes = [TextNode(text, TextType.NORMAL_TEXT)]
+    nodes = split_nodes_delimiter(nodes, "**", TextType.BOLD_TEXT)
+    nodes = split_nodes_delimiter(nodes, "_", TextType.ITALIC_TEXT)
+    nodes = split_nodes_delimiter(nodes, "`", TextType.CODE_TEXT)
+    nodes = split_nodes_image(nodes)
+    nodes = split_nodes_link(nodes)
+    return nodes
 
+def main():
+    test_text = "This is **text** with an _italic_ word and a `code block` and an ![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) and a [link](https://boot.dev)"
+    result = text_to_textnodes(test_text)
+    for node in result:
+        print(node)
 
 main()
 
