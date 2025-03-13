@@ -39,16 +39,51 @@ def split_nodes_delimiter(old_nodes, delimiter, text_type):
                 new_nodes.append(TextNode(text, node_text_type))
         return(new_nodes)
 
+def split_nodes_image(old_nodes):
+    new_nodes = []
+    first_part = old_nodes.text.split("!")[0]
+    second_part = extract_markdown_images(old_nodes.text)[0]
+    third_part = re.findall(r"\)(.*?)\!", old_nodes.text)[0]
+    fourth_part = extract_markdown_images(old_nodes.text)[1]
+
+    new_nodes.append(TextNode(first_part, TextType.NORMAL_TEXT))
+    new_nodes.append(TextNode(second_part[0], TextType.IMAGES, second_part[1]))
+    new_nodes.append(TextNode(third_part, TextType.NORMAL_TEXT))
+    new_nodes.append(TextNode(fourth_part[0], TextType.IMAGES, fourth_part[1]))
+
+
+def split_nodes_link(old_nodes):
+    new_nodes = []
+    first_part = old_nodes.text.split("[")[0]
+    second_part = extract_markdown_links(old_nodes.text)[0]
+    third_part = re.findall(r"\)(.*?)\[", old_nodes.text)[0]
+    fourth_part = extract_markdown_links(old_nodes.text)[1]
+    
+    
+    new_nodes.append(TextNode(first_part, TextType.NORMAL_TEXT))
+    new_nodes.append(TextNode(second_part[0], TextType.LINK, second_part[1]))
+    new_nodes.append(TextNode(third_part, TextType.NORMAL_TEXT))
+    new_nodes.append(TextNode(fourth_part[0], TextType.NORMAL_TEXT, fourth_part[1]))
+    
+
+
+
 def extract_markdown_images(text):
     return re.findall(r"!\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
 
 def extract_markdown_links(text):
     return re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
 
-
 def main():
     my_node = TextNode("This is text with a `code block` word", TextType.NORMAL_TEXT)
     print(split_nodes_delimiter([my_node], "`", TextType.CODE_TEXT))
+
+    node = TextNode(
+        "This is text with an ![image](https://i.imgur.com/zjjcJKZ.png) and another ![second image](https://i.imgur.com/3elNhQu.png)",
+        TextType.NORMAL_TEXT
+    )
+    print()
+    (split_nodes_image(node))
 
 
 main()
