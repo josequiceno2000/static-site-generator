@@ -40,21 +40,22 @@ def split_nodes_delimiter(old_nodes, delimiter, text_type):
         return(new_nodes)
 
 def extract_markdown_images(text):
-    alt_text_tuple = re.findall(r"\[(.*?)\]", text)
-    link_tuple = re.findall(r"\((.*?)\)", text)
-    
-    my_list = []
-    for alt, link in zip(alt_text_tuple, link_tuple):
-        my_list.append(alt)
-        my_list.append(link)
-    
-    return my_list
+    return re.findall(r"!\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+
+def extract_markdown_links(text):
+    return re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+
 
 def main():
     my_node = TextNode("This is text with a `code block` word", TextType.NORMAL_TEXT)
     print(split_nodes_delimiter([my_node], "`", TextType.CODE_TEXT))
+
     text = "This is text with a ![rick roll](https://i.imgur.com/aKaOqIh.gif) and ![obi wan](https://i.imgur.com/fJRm4Vk.jpeg)"
     print(extract_markdown_images(text))
+    # [("rick roll", "https://i.imgur.com/aKaOqIh.gif"), ("obi wan", "https://i.imgur.com/fJRm4Vk.jpeg")]
+    
+    text = "This is text with a link [to boot dev](https://www.boot.dev) and [to youtube](https://www.youtube.com/@bootdotdev)"
+    print(extract_markdown_links(text))
 
 main()
 
