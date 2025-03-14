@@ -2,6 +2,7 @@ import re
 import os
 import shutil
 import logging
+import sys
 from enum import Enum
 from textnode import TextNode, TextType
 from htmlnode import LeafNode, ParentNode, HTMLNode
@@ -174,63 +175,105 @@ def text_to_children(text):
     html_nodes = []
     for text_node in text_nodes:
         html_node = text_node_to_html_node(text_node)
+
+        if isinstance(html_node, LeafNode) and not html_node.value:
+            print(f"Warning: Skipping leaf node with no value: {html_node}")
+            continue
+
         html_nodes.append(html_node)
     return html_nodes
 
 def process_paragraph(block):
     children = text_to_children(block)
+
+    if not children:
+        children = [LeafNode(None, block)]
+
     return ParentNode("p", children)
 
 def process_heading(block):
     match = re.match(r"^(#{1,6}) (.+)$", block)
+
+    if not match:
+        return ParentNode("h1", [LeafNode(None, block)])
+
     level = len(match.group(1))
     text = match.group(2)
     children = text_to_children(text)
+
+    if not children:
+        children = [LeafNode(None, text)]
+
     return ParentNode(f"h{level}", children)
 
 def process_code(block):
-    content = block.strip("```").strip()
-    if content.startswith('\n'):
-        content = content[1:]
-    
-    text_node = TextNode(content, TextType.NORMAL_TEXT)
-    code_node = text_node_to_html_node(text_node)
+    lines = block.split("\n")
+    if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].endswith("```"):
+        content = "\n".join(lines[1:-1])
+    else:
+        content = block.strip("`").strip()
 
-    code_parent = ParentNode("code", [code_node])
-    return ParentNode("pre", [code_parent])
+    if not content:
+        content = " "
+
+    code_node = LeafNode("code", content)
+
+    return ParentNode("pre", [code_node])
 
 def process_quote(block):
+    """Convert a quote block to an HTMLNode."""
+    # Remove the > marker from each line
     lines = block.split("\n")
-    cleaned_lines = [line[1:].strip() for line in lines]
-    clean_text = "\n".join(cleaned_lines)
-
+    clean_lines = [line[1:].strip() if line.startswith('>') else line.strip() for line in lines]
+    clean_text = "\n".join(clean_lines)
+    
     children = text_to_children(clean_text)
+    # Make sure we have at least one child
+    if not children:
+        children = [LeafNode(None, clean_text)]
     return ParentNode("blockquote", children)
 
 def process_unordered_list(block):
+    """Convert an unordered list block to an HTMLNode."""
     lines = block.split("\n")
     list_items = []
-
+    
     for line in lines:
         if line.strip():
-
-            text = line[2:].strip()
+            # Remove the "- " marker
+            text = line[2:].strip() if line.startswith("- ") else line.strip()
             children = text_to_children(text)
+            # Make sure we have at least one child
+            if not children:
+                children = [LeafNode(None, text)]
             list_items.append(ParentNode("li", children))
-
+    
+    # Make sure we have at least one item
+    if not list_items:
+        list_items = [ParentNode("li", [LeafNode(None, "")])]
+    
     return ParentNode("ul", list_items)
 
 def process_ordered_list(block):
     lines = block.split("\n")
     list_items = []
-
+    
     for line in lines:
         if line.strip():
+            # Remove the "number. " marker
             text = re.sub(r"^\d+\.\s*", "", line).strip()
             children = text_to_children(text)
+            # Make sure we have at least one child
+            if not children:
+                children = [LeafNode(None, text)]
             list_items.append(ParentNode("li", children))
     
+    # Make sure we have at least one item
+    if not list_items:
+        list_items = [ParentNode("li", [LeafNode(None, "")])]
+    
     return ParentNode("ol", list_items)
+
 
 def markdown_to_html_node(markdown):
     """Convert a markdown string to a single HTMLNode object"""
@@ -243,19 +286,28 @@ def markdown_to_html_node(markdown):
 
         block_type = block_to_block_type(block)
 
-        match block_type:
-            case BlockType.PARAGRAPH:
-                block_nodes.append(process_paragraph(block))
-            case BlockType.HEADING:
-                block_nodes.append(process_heading(block))
-            case BlockType.CODE:
-                block_nodes.append(process_code(block))
-            case BlockType.QUOTE:
-                block_nodes.append(process_quote(block))
-            case BlockType.UNORDERED_LIST:
-                block_nodes.append(process_unordered_list(block))
-            case BlockType.ORDERED_LIST:
-                block_nodes.append(process_ordered_list(block))
+        try:
+            match block_type:
+                case BlockType.PARAGRAPH:
+                    block_nodes.append(process_paragraph(block))
+                case BlockType.HEADING:
+                    block_nodes.append(process_heading(block))
+                case BlockType.CODE:
+                    block_nodes.append(process_code(block))
+                case BlockType.QUOTE:
+                    block_nodes.append(process_quote(block))
+                case BlockType.UNORDERED_LIST:
+                    block_nodes.append(process_unordered_list(block))
+                case BlockType.ORDERED_LIST:
+                    block_nodes.append(process_ordered_list(block))
+        except Exception as e:
+            print(f"Error processing block of type {block_type}: {e}")
+            print(f"Block content: {block}")
+
+            block_nodes.append(ParentNode("p", [LeafNode(None, block)]))
+
+    if not block_nodes:
+        block_nodes = [ParentNode("p", [LeafNode(None, "Empty markdown document")])]
 
     return ParentNode("div", block_nodes)     
 
@@ -300,13 +352,67 @@ def _copy_contents(src, dst):
             _copy_contents(src_path, dst_path)
 
 def extract_title(markdown):
-    if ("# ") not in markdown:
-        raise Exception("No h1 header in file")
+    match = re.search(r"^#\s+(.+)$", markdown, re.MULTILINE)
+    if match:
+        return match.group(1).strip()
     else:
-        pass
+        raise Exception("No h1 header found!")
+    
+def generate_page(from_path, template_path, dest_path):
+    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
+    
+    # Read the markdown file
+    with open(from_path, 'r', encoding='utf-8') as md_file:
+        markdown_content = md_file.read()
+    
+    # Read the template file
+    with open(template_path, 'r', encoding='utf-8') as template_file:
+        template_content = template_file.read()
+    
+    # Convert markdown to HTML
+    html_node = markdown_to_html_node(markdown_content)
+    
+    try:
+        html_content = html_node.to_html()
+    except ValueError as e:
+        print(f"Error generating HTML: {e}")
+        print("Falling back to simple HTML generation")
+        html_content = f"<div><p>Error converting markdown to HTML: {e}</p></div>"
+    
+    # Extract title
+    try:
+        title = extract_title(markdown_content)
+    except Exception as e:
+        print(f"Error extracting title: {e}")
+        title = "Untitled Page"
+    
+    # Replace placeholders in template
+    final_html = template_content.replace("{{ Title }}", title)
+    final_html = final_html.replace("{{ Content }}", html_content)
+    
+    # Create destination directory if it doesn't exist
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    
+    # Write the final HTML to the destination file
+    with open(dest_path, 'w', encoding='utf-8') as dest_file:
+        dest_file.write(final_html)
+    
+    print(f"Successfully generated {dest_path}")
 
 def main():
-    copy_directory("static", "public")
+    try:
+        print(f"Now beggining static site generation...")
+        copy_directory("static", "public")
+        generate_page(
+            from_path="content/index.md",
+            template_path="template.html",
+            dest_path="public/index.html"
+        )
+
+        print("Static site generated!")
+    except Exception as e:
+        print(f"Error during site generation: {e}")
+        sys.exit(1)
     
 
 main()
