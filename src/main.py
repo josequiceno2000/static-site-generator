@@ -165,6 +165,97 @@ def is_consecutive_ordered_list(lines):
         expected_number += 1
     return True
 
+def text_to_children(text):
+    """Convert a string of text to a list of HTMLNodes by parsing markdown"""
+    text_nodes = text_to_textnodes(text)
+    html_nodes = []
+    for text_node in text_nodes:
+        html_node = text_node_to_html_node(text_node)
+        html_nodes.append(html_node)
+    return html_nodes
+
+def process_paragraph(block):
+    children = text_to_children(block)
+    return ParentNode("p", children)
+
+def process_heading(block):
+    match = re.match(r"^(#{1,6}) (.+)$", block)
+    level = len(match.group(1))
+    text = match.group(2)
+    children = text_to_children(text)
+    return ParentNode(f"h{level}", children)
+
+def process_code(block):
+    content = block.strip("```").strip()
+    if content.startswith('\n'):
+        content = content[1:]
+    
+    text_node = TextNode(content, TextType.NORMAL_TEXT)
+    code_node = text_node_to_html_node(text_node)
+
+    code_parent = ParentNode("code", [code_node])
+    return ParentNode("pre", [code_parent])
+
+def process_quote(block):
+    lines = block.split("\n")
+    cleaned_lines = [line[1:].strip() for line in lines]
+    clean_text = "\n".join(cleaned_lines)
+
+    children = text_to_children(clean_text)
+    return ParentNode("blockquote", children)
+
+def process_unordered_list(block):
+    lines = block.split("\n")
+    list_items = []
+
+    for line in lines:
+        if line.strip():
+
+            text = line[2:].strip()
+            children = text_to_children(text)
+            list_items.append(ParentNode("li", children))
+
+    return ParentNode("ul", list_items)
+
+def process_ordered_list(block):
+    lines = block.split("\n")
+    list_items = []
+
+    for line in lines:
+        if line.strip():
+            text = re.sub(r"^\d+\.\s*", "", line).strip()
+            children = text_to_children(text)
+            list_items.append(ParentNode("li", children))
+    
+    return ParentNode("ol", list_items)
+
+def markdown_to_html_node(markdown):
+    """Convert a markdown string to a single HTMLNode object"""
+    blocks = markdown_to_blocks(markdown)
+    block_nodes = []
+
+    for block in blocks:
+        if not block.strip():
+            continue
+
+        block_type = block_to_block_type(block)
+
+        match block_type:
+            case BlockType.PARAGRAPH:
+                block_nodes.append(process_paragraph(block))
+            case BlockType.HEADING:
+                block_nodes.append(process_heading(block))
+            case BlockType.CODE:
+                block_nodes.append(process_code(block))
+            case BlockType.QUOTE:
+                block_nodes.append(process_quote(block))
+            case BlockType.UNORDERED_LIST:
+                block_nodes.append(process_unordered_list(block))
+            case BlockType.ORDERED_LIST:
+                block_nodes.append(process_ordered_list(block))
+
+    return ParentNode("div", block_nodes)     
+
 def main():
     pass
     
