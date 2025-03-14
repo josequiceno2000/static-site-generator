@@ -1,4 +1,5 @@
 import re
+from enum import Enum
 from textnode import TextNode, TextType
 from htmlnode import LeafNode, ParentNode, HTMLNode
 
@@ -117,11 +118,56 @@ def text_to_textnodes(text):
     nodes = split_nodes_link(nodes)
     return nodes
 
+def markdown_to_blocks(markdown): 
+    lines = markdown.split("\n\n")
+    stripped_lines = [line.strip("\n    ") for line in lines]
+    cleaned_lines = [line.replace("\n    ", "\n") for line in stripped_lines]
+    return cleaned_lines
+
+# Block Types
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
+
+def block_to_block_type(markdown):
+    lines = markdown.split("\n")
+    
+    if markdown.startswith("```") and markdown.endswith("```"):
+        return BlockType.CODE
+    elif re.match(r"^(#{1,6}) ", markdown):
+        return BlockType.HEADING
+    elif all(line.startswith(">") for line in lines):
+        return BlockType.QUOTE
+    elif all(line.startswith("- ") for line in lines):
+        return BlockType.UNORDERED_LIST
+    elif is_consecutive_ordered_list(lines):
+        return BlockType.ORDERED_LIST
+    else:
+        return BlockType.PARAGRAPH
+
+def is_consecutive_ordered_list(lines):
+    lines = [line.strip() for line in lines if line.strip()]
+    if not lines:
+        return False
+    
+    expected_number = 1
+    for line in lines:
+        match = re.match(r"^(\d+)\. ", line)
+        if not match:
+            return False
+        number = int(match.group(1))
+        if number != expected_number:
+            return False
+        expected_number += 1
+    return True
+
 def main():
-    test_text = "This is **text** with an _italic_ word and a `code block` and an ![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) and a [link](https://boot.dev)"
-    result = text_to_textnodes(test_text)
-    for node in result:
-        print(node)
+    pass
+    
 
 main()
 
