@@ -358,15 +358,7 @@ def extract_title(markdown):
     else:
         raise Exception("No h1 header found!")
     
-def generate_page(from_path, template_path, dest_path):
-    """
-    Generate an HTML page from a markdown file using a template.
-    
-    Args:
-        from_path (str): Path to the markdown file
-        template_path (str): Path to the template file
-        dest_path (str): Path where the generated HTML file will be saved
-    """
+def generate_page(from_path, template_path, dest_path, basepath):
     print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     
     # Read the markdown file
@@ -397,6 +389,8 @@ def generate_page(from_path, template_path, dest_path):
     # Replace placeholders in template
     final_html = template_content.replace("{{ Title }}", title)
     final_html = final_html.replace("{{ Content }}", html_content)
+    final_html = final_html.replace('href="/', 'href="{basepath}')
+    final_html = final_html.replace('src="/', 'src="{basepath}')
     
     # Create destination directory if it doesn't exist
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
@@ -442,7 +436,7 @@ def copy_directory(source_dir, dest_dir):
     
     print(f"Copy completed: '{source_dir}' → '{dest_dir}'")
     
-def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path, basepath):
     os.makedirs(dest_dir_path, exist_ok=True)
 
     for entry in os.listdir(dir_path_content):
@@ -452,25 +446,31 @@ def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
             relative_path = os.path.relpath(entry_path, dir_path_content)
             dest_subdir = os.path.join(dest_dir_path, relative_path)
 
-            generate_pages_recursive(entry_path, template_path, dest_subdir)
+            generate_pages_recursive(entry_path, template_path, dest_subdir, basepath)
         
         elif entry.endswith('.md'):
             output_filename = os.path.splitext(entry)[0] + '.html'
             output_path = os.path.join(dest_dir_path, output_filename)
 
-            generate_page(entry_path, template_path, output_path)
+            generate_page(entry_path, template_path, output_path, basepath)
             print(f"Generated {output_path} from {entry_path}")
 
 
 
 def main():
+    if len(sys.argv) > 1:
+        basepath = sys.argv[1]
+    else:
+        basepath = "/"
+
     try:
         print(f"Now beginning static site generation...")
-        copy_directory("static", "public")
+        copy_directory("static", "docs")
         generate_pages_recursive(
             dir_path_content="content",
             template_path="template.html",
-            dest_dir_path="public"
+            dest_dir_path="docs",
+            basepath=basepath
         )
 
         print("Static site generated!")
