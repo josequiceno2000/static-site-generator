@@ -299,6 +299,12 @@ def _copy_contents(src, dst):
                 logging.info(f"Created new directory: {dst_path}")
             _copy_contents(src_path, dst_path)
 
+def extract_title(markdown):
+    if ("# ") not in markdown:
+        raise Exception("No h1 header in file")
+    else:
+        pass
+
 def main():
     copy_directory("static", "public")
     
