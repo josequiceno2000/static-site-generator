@@ -1,4 +1,7 @@
 import re
+import os
+import shutil
+import logging
 from enum import Enum
 from textnode import TextNode, TextType
 from htmlnode import LeafNode, ParentNode, HTMLNode
@@ -256,8 +259,48 @@ def markdown_to_html_node(markdown):
 
     return ParentNode("div", block_nodes)     
 
+def copy_directory(source_dir, dest_dir):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+
+    if not os.path.exists(source_dir):
+        logging.error(f"Source directory '{source_dir}' does not exist!")
+        return
+    
+    if os.path.exists(dest_dir):
+        logging.info(f"Deleting contents of '{dest_dir}'")
+        for item in os.listdir(dest_dir):
+            item_path = os.path.join(dest_dir, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+                logging.info(f"Deleted file: {item_path}")
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+                logging.info(f"Deleted directory: {item_path}")
+    
+    else:
+        os.makedirs(dest_dir)
+        logging.info(f"Created destination directory: {dest_dir}")
+
+    _copy_contents(source_dir, dest_dir)
+
+    logging.info(f"Copy finalized: '{source_dir}' -> '{dest_dir}'")
+
+def _copy_contents(src, dst):
+    for item in os.listdir(src):
+        src_path = os.path.join(src, item)
+        dst_path = os.path.join(dst, item)
+
+        if os.path.isfile(src_path):
+            shutil.copy2(src_path, dst_path)
+            logging.info(f"Copied file: {src_path} to {dst_path}")
+        elif os.path.isdir(src_path):
+            if not os.path.exists(dst_path):
+                os.makedirs(dst_path)
+                logging.info(f"Created new directory: {dst_path}")
+            _copy_contents(src_path, dst_path)
+
 def main():
-    pass
+    copy_directory("static", "public")
     
 
 main()
