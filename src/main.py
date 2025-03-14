@@ -359,6 +359,14 @@ def extract_title(markdown):
         raise Exception("No h1 header found!")
     
 def generate_page(from_path, template_path, dest_path):
+    """
+    Generate an HTML page from a markdown file using a template.
+    
+    Args:
+        from_path (str): Path to the markdown file
+        template_path (str): Path to the template file
+        dest_path (str): Path where the generated HTML file will be saved
+    """
     print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     
     # Read the markdown file
@@ -399,14 +407,70 @@ def generate_page(from_path, template_path, dest_path):
     
     print(f"Successfully generated {dest_path}")
 
+def copy_directory(source_dir, dest_dir):
+    """
+    Recursively copy all contents from source_dir to dest_dir.
+    First deletes all contents of dest_dir for a clean copy.
+    
+    Args:
+        source_dir (str): Path to source directory
+        dest_dir (str): Path to destination directory
+    """
+    # Ensure source directory exists
+    if not os.path.exists(source_dir):
+        print(f"Source directory '{source_dir}' does not exist!")
+        return
+    
+    # Delete destination directory contents if it exists
+    if os.path.exists(dest_dir):
+        print(f"Deleting contents of '{dest_dir}'")
+        for item in os.listdir(dest_dir):
+            item_path = os.path.join(dest_dir, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+                print(f"Deleted file: {item_path}")
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+                print(f"Deleted directory: {item_path}")
+    else:
+        # Create destination directory if it doesn't exist
+        os.makedirs(dest_dir)
+        print(f"Created destination directory: {dest_dir}")
+    
+    # Recursively copy from source to destination
+    _copy_contents(source_dir, dest_dir)
+    
+    print(f"Copy completed: '{source_dir}' → '{dest_dir}'")
+    
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+    os.makedirs(dest_dir_path, exist_ok=True)
+
+    for entry in os.listdir(dir_path_content):
+        entry_path = os.path.join(dir_path_content, entry)
+
+        if os.path.isdir(entry_path):
+            relative_path = os.path.relpath(entry_path, dir_path_content)
+            dest_subdir = os.path.join(dest_dir_path, relative_path)
+
+            generate_pages_recursive(entry_path, template_path, dest_subdir)
+        
+        elif entry.endswith('.md'):
+            output_filename = os.path.splitext(entry)[0] + '.html'
+            output_path = os.path.join(dest_dir_path, output_filename)
+
+            generate_page(entry_path, template_path, output_path)
+            print(f"Generated {output_path} from {entry_path}")
+
+
+
 def main():
     try:
-        print(f"Now beggining static site generation...")
+        print(f"Now beginning static site generation...")
         copy_directory("static", "public")
-        generate_page(
-            from_path="content/index.md",
+        generate_pages_recursive(
+            dir_path_content="content",
             template_path="template.html",
-            dest_path="public/index.html"
+            dest_dir_path="public"
         )
 
         print("Static site generated!")
@@ -414,6 +478,6 @@ def main():
         print(f"Error during site generation: {e}")
         sys.exit(1)
     
-
-main()
+if __name__ == "__main__":
+    main()
 
